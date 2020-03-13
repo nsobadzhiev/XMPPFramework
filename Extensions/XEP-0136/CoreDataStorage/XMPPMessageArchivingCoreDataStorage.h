@@ -32,14 +32,14 @@
 + (instancetype)sharedInstance;
 
 
-@property (strong) NSString *messageEntityName;
-@property (strong) NSString *contactEntityName;
+@property (strong, atomic) NSString *messageEntityName;
+@property (strong, atomic) NSString *contactEntityName;
 
 /**
  * Defines elements within an archived message that will be tested for content presence
  * when determining whether to store the message. By default, only the body element is examined.
  */
-@property (copy, nonatomic) NSArray<NSString *> *relevantContentXPaths;
+@property (copy, atomic) NSArray<NSString *> *relevantContentXPaths;
 
 - (NSEntityDescription *)messageEntity:(NSManagedObjectContext *)moc;
 - (NSEntityDescription *)contactEntity:(NSManagedObjectContext *)moc;
