@@ -18,9 +18,6 @@
 
 @interface XMPPMessageArchivingCoreDataStorage ()
 {
-	NSString *messageEntityName;
-	NSString *contactEntityName;
-    NSArray<NSString *> *relevantContentXPaths;
 }
 
 @end
@@ -33,11 +30,14 @@
 
 static XMPPMessageArchivingCoreDataStorage *sharedInstance;
 
+@synthesize relevantContentXPaths;
+@synthesize messageEntityName;
+@synthesize contactEntityName;
+
 + (instancetype)sharedInstance
 {
 	static dispatch_once_t onceToken;
 	dispatch_once(&onceToken, ^{
-		
 		sharedInstance = [[XMPPMessageArchivingCoreDataStorage alloc] initWithDatabaseFilename:nil storeOptions:nil];
 	});
 	
@@ -82,7 +82,7 @@ static XMPPMessageArchivingCoreDataStorage *sharedInstance;
 	NSFetchRequest *fetchRequest = [[NSFetchRequest alloc] init];
 	fetchRequest.entity = messageEntity;
 	fetchRequest.predicate = predicate;
-	fetchRequest.fetchBatchSize = saveThreshold;
+	fetchRequest.fetchBatchSize = self.saveThreshold;
 	
 	NSError *error = nil;
 	NSArray *messages = [moc executeFetchRequest:fetchRequest error:&error];
@@ -99,7 +99,7 @@ static XMPPMessageArchivingCoreDataStorage *sharedInstance;
 	{
 		[moc deleteObject:message];
 		
-		if (++count > saveThreshold)
+		if (++count > self.saveThreshold)
 		{
 			if (![moc save:&error])
 			{
@@ -273,62 +273,6 @@ static XMPPMessageArchivingCoreDataStorage *sharedInstance;
 	}
 }
 
-- (NSString *)messageEntityName
-{
-	__block NSString *result = nil;
-	
-	dispatch_block_t block = ^{
-		result = self->messageEntityName;
-	};
-	
-	if (dispatch_get_specific(storageQueueTag))
-		block();
-	else
-		dispatch_sync(storageQueue, block);
-	
-	return result;
-}
-
-- (void)setMessageEntityName:(NSString *)entityName
-{
-	dispatch_block_t block = ^{
-		self->messageEntityName = entityName;
-	};
-	
-	if (dispatch_get_specific(storageQueueTag))
-		block();
-	else
-		dispatch_async(storageQueue, block);
-}
-
-- (NSString *)contactEntityName
-{
-	__block NSString *result = nil;
-	
-	dispatch_block_t block = ^{
-		result = self->contactEntityName;
-	};
-	
-	if (dispatch_get_specific(storageQueueTag))
-		block();
-	else
-		dispatch_sync(storageQueue, block);
-	
-	return result;
-}
-
-- (void)setContactEntityName:(NSString *)entityName
-{
-	dispatch_block_t block = ^{
-		self->contactEntityName = entityName;
-	};
-	
-	if (dispatch_get_specific(storageQueueTag))
-		block();
-	else
-		dispatch_async(storageQueue, block);
-}
-
 - (NSEntityDescription *)messageEntity:(NSManagedObjectContext *)moc
 {
 	// This is a public method, and may be invoked on any queue.
@@ -343,36 +287,6 @@ static XMPPMessageArchivingCoreDataStorage *sharedInstance;
 	// So be sure to go through the public accessor for the entity name.
 	
 	return [NSEntityDescription entityForName:[self contactEntityName] inManagedObjectContext:moc];
-}
-
-- (NSArray<NSString *> *)relevantContentXPaths
-{
-	__block NSArray *result;
-
-	dispatch_block_t block = ^{
-		result = self->relevantContentXPaths;
-	};
-
-	if (dispatch_get_specific(storageQueueTag))
-		block();
-	else
-		dispatch_sync(storageQueue, block);
-
-	return result;
-}
-
-- (void)setRelevantContentXPaths:(NSArray<NSString *> *)relevantContentXPathsToSet
-{
-	NSArray *newValue = [relevantContentXPathsToSet copy];
-	
-	dispatch_block_t block = ^{
-		self->relevantContentXPaths = newValue;
-	};
-	
-	if (dispatch_get_specific(storageQueueTag))
-		block();
-	else
-		dispatch_async(storageQueue, block);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

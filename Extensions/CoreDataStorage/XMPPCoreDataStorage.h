@@ -43,28 +43,9 @@
 	NSMutableDictionary *myJidCache;
 	
 	int32_t pendingRequests;
-	
-	NSManagedObjectModel *managedObjectModel;
-	NSPersistentStoreCoordinator *persistentStoreCoordinator;
+
 	NSManagedObjectContext *managedObjectContext;
 	NSManagedObjectContext *mainThreadManagedObjectContext;
-    
-    NSMutableArray *willSaveManagedObjectContextBlocks;
-    NSMutableArray *didSaveManagedObjectContextBlocks;
-	
-@protected
-	
-	NSString *databaseFileName;
-    NSDictionary *storeOptions;
-	NSUInteger saveThreshold;
-	NSUInteger saveCount;
-    
-    BOOL autoRemovePreviousDatabaseFile;
-    BOOL autoRecreateDatabaseFile;
-    BOOL autoAllowExternalBinaryDataStorage;
-	
-	dispatch_queue_t storageQueue;
-	void *storageQueueTag;
 }
 
 /**
@@ -104,7 +85,7 @@
  *
  * Default 500
 **/
-@property (readwrite) NSUInteger saveThreshold;
+@property (atomic, readwrite) NSUInteger saveThreshold;
 
 /**
  * Provides access to the the thread-safe components of the CoreData stack.
@@ -146,7 +127,7 @@
  * Default NO
 **/
 
-@property (readwrite) BOOL autoRemovePreviousDatabaseFile;
+@property (atomic, readwrite) BOOL autoRemovePreviousDatabaseFile;
 
 /**
  * The Database File is automatically recreated if the persistant store cannot read it e.g. the model changed or the file became corrupt.
@@ -154,7 +135,7 @@
  *
  * Default NO
 **/
-@property (readwrite) BOOL autoRecreateDatabaseFile;
+@property (atomic, readwrite) BOOL autoRecreateDatabaseFile;
 
 /**
  * This method calls setAllowsExternalBinaryDataStorage:YES for all Binary Data Attributes in the Managed Object Model.
@@ -162,6 +143,6 @@
  *
  * Default NO
 **/
-@property (readwrite) BOOL autoAllowExternalBinaryDataStorage;
+@property (atomic, readwrite) BOOL autoAllowExternalBinaryDataStorage;
 
 @end

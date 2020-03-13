@@ -19,9 +19,6 @@
   static const int xmppLogLevel = XMPP_LOG_LEVEL_WARN;
 #endif
 
-#define AssertPrivateQueue() \
-        NSAssert(dispatch_get_specific(storageQueueTag), @"Private method: MUST run on storageQueue");
-
 
 @implementation XMPPRosterCoreDataStorage
 
@@ -48,8 +45,8 @@ static XMPPRosterCoreDataStorage *sharedInstance;
 	[super commonInit];
 	
 	// This method is invoked by all public init methods of the superclass
-    autoRemovePreviousDatabaseFile = YES;
-	autoRecreateDatabaseFile = YES;
+    self.autoRemovePreviousDatabaseFile = YES;
+	self.autoRecreateDatabaseFile = YES;
     
 	rosterPopulationSet = [[NSMutableSet alloc] init];
 }
@@ -94,8 +91,7 @@ static XMPPRosterCoreDataStorage *sharedInstance;
 - (void)_clearAllResourcesForXMPPStream:(XMPPStream *)stream
 {
 	XMPPLogTrace();
-	AssertPrivateQueue();
-	
+
 	NSManagedObjectContext *moc = [self managedObjectContext];
 	
 	NSEntityDescription *entity = [NSEntityDescription entityForName:@"XMPPResourceCoreDataStorageObject"
@@ -103,7 +99,7 @@ static XMPPRosterCoreDataStorage *sharedInstance;
 	
 	NSFetchRequest *fetchRequest = [[NSFetchRequest alloc] init];
 	[fetchRequest setEntity:entity];
-	[fetchRequest setFetchBatchSize:saveThreshold];
+	[fetchRequest setFetchBatchSize:self.saveThreshold];
 	
 	if (stream)
 	{
@@ -124,7 +120,7 @@ static XMPPRosterCoreDataStorage *sharedInstance;
 		[moc deleteObject:resource];
         [user recalculatePrimaryResource];
         
-		if (++unsavedCount >= saveThreshold)
+		if (++unsavedCount >= self.saveThreshold)
 		{
 			[self save];
 			unsavedCount = 0;
@@ -280,7 +276,7 @@ static XMPPRosterCoreDataStorage *sharedInstance;
 		
 		NSFetchRequest *fetchRequest = [[NSFetchRequest alloc] init];
 		[fetchRequest setEntity:entity];
-		[fetchRequest setFetchBatchSize:self->saveThreshold];
+		[fetchRequest setFetchBatchSize:self.saveThreshold];
 		
 		if (stream)
 		{
@@ -457,7 +453,7 @@ static XMPPRosterCoreDataStorage *sharedInstance;
 		
 		NSFetchRequest *fetchRequest = [[NSFetchRequest alloc] init];
 		[fetchRequest setEntity:entity];
-		[fetchRequest setFetchBatchSize:self->saveThreshold];
+		[fetchRequest setFetchBatchSize:self.saveThreshold];
 		
 		if (stream)
 		{
@@ -476,7 +472,7 @@ static XMPPRosterCoreDataStorage *sharedInstance;
 		{
 			[moc deleteObject:user];
 			
-			if (++unsavedCount >= self->saveThreshold)
+			if (++unsavedCount >= self.saveThreshold)
 			{
 				[self save];
 				unsavedCount = 0;
@@ -502,7 +498,7 @@ static XMPPRosterCoreDataStorage *sharedInstance;
 		
 		NSFetchRequest *fetchRequest = [[NSFetchRequest alloc] init];
 		[fetchRequest setEntity:entity];
-		[fetchRequest setFetchBatchSize:self->saveThreshold];
+		[fetchRequest setFetchBatchSize:self.saveThreshold];
 		
 		if (stream)
 		{
