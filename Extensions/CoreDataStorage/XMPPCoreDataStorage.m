@@ -670,7 +670,7 @@ static NSMutableSet *databaseFileNames;
 		
 		if ([NSManagedObjectContext instancesRespondToSelector:@selector(initWithConcurrencyType:)])
 			managedObjectContext =
-			    [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
+			    [[NSManagedObjectContext alloc] initWithConcurrencyType:NSConfinementConcurrencyType];
 		else
 			managedObjectContext = [[NSManagedObjectContext alloc] init];
 		
@@ -719,16 +719,7 @@ static NSMutableSet *databaseFileNames;
 		else
 			mainThreadManagedObjectContext = [[NSManagedObjectContext alloc] init];
 		
-		if (dispatch_get_specific(storageQueueTag))
-        {
-            mainThreadManagedObjectContext.parentContext = [self managedObjectContext];
-        }
-        else
-        {
-            dispatch_sync(storageQueue, ^{
-                mainThreadManagedObjectContext.parentContext = [self managedObjectContext];
-            });
-        }
+		mainThreadManagedObjectContext.persistentStoreCoordinator = coordinator;
 		mainThreadManagedObjectContext.undoManager = nil;
 		
 		[[NSNotificationCenter defaultCenter] addObserver:self
