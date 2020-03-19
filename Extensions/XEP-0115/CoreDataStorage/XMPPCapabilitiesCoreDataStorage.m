@@ -36,7 +36,7 @@ static XMPPCapabilitiesCoreDataStorage *sharedInstance;
 	XMPPLogTrace();
 	[super commonInit];
 
-	self.autoRecreateDatabaseFile = YES;
+	autoRecreateDatabaseFile = YES;
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma mark Setup
@@ -53,6 +53,8 @@ static XMPPCapabilitiesCoreDataStorage *sharedInstance;
 
 - (XMPPCapsResourceCoreDataStorageObject *)resourceForJID:(XMPPJID *)jid xmppStream:(XMPPStream *)stream
 {
+	NSAssert(dispatch_get_specific(storageQueueTag), @"Invoked on incorrect queue");
+	
 	XMPPLogTrace2(@"%@: %@ %@", THIS_FILE, THIS_METHOD, jid);
 	
 	if (jid == nil) return nil;
@@ -82,6 +84,8 @@ static XMPPCapabilitiesCoreDataStorage *sharedInstance;
 
 - (XMPPCapsCoreDataStorageObject *)capsForHash:(NSString *)hash algorithm:(NSString *)hashAlg
 {
+	NSAssert(dispatch_get_specific(storageQueueTag), @"Invoked on incorrect queue");
+	
 	XMPPLogTrace2(@"%@: capsForHash:%@ algorithm:%@", THIS_FILE, hash, hashAlg);
 	
 	if (hash == nil) return nil;
@@ -108,12 +112,14 @@ static XMPPCapabilitiesCoreDataStorage *sharedInstance;
 
 - (void)_clearAllNonPersistentCapabilitiesForXMPPStream:(XMPPStream *)stream
 {
+	NSAssert(dispatch_get_specific(storageQueueTag), @"Invoked on incorrect queue");
+	
 	NSEntityDescription *entity = [NSEntityDescription entityForName:@"XMPPCapsResourceCoreDataStorageObject"
 	                                          inManagedObjectContext:[self managedObjectContext]];
 	
 	NSFetchRequest *fetchRequest = [[NSFetchRequest alloc] init];
 	[fetchRequest setEntity:entity];
-	[fetchRequest setFetchBatchSize:self.saveThreshold];
+	[fetchRequest setFetchBatchSize:saveThreshold];
 	
 	if (stream)
 	{
@@ -145,7 +151,7 @@ static XMPPCapabilitiesCoreDataStorage *sharedInstance;
 		
 		[[self managedObjectContext] deleteObject:resource];
 		
-		if (++unsavedCount >= self.saveThreshold)
+		if (++unsavedCount >= saveThreshold)
 		{
 			[self save];
 		}
@@ -192,6 +198,9 @@ static XMPPCapabilitiesCoreDataStorage *sharedInstance;
 
 - (NSXMLElement *)capabilitiesForJID:(XMPPJID *)jid ext:(NSString **)extPtr xmppStream:(XMPPStream *)stream
 {
+	// By design this method should not be invoked from the storageQueue.
+	NSAssert(!dispatch_get_specific(storageQueueTag), @"Invoked on incorrect queue");
+	
 	XMPPLogTrace();
 	
 	__block NSXMLElement *result = nil;
@@ -301,7 +310,7 @@ static XMPPCapabilitiesCoreDataStorage *sharedInstance;
                  xmppStream:(XMPPStream *)stream
 {
 	// By design this method should not be invoked from the storageQueue.
-//	NSAssert(!dispatch_get_specific(storageQueueTag), @"Invoked on incorrect queue");
+	NSAssert(!dispatch_get_specific(storageQueueTag), @"Invoked on incorrect queue");
 	
 	XMPPLogTrace();
 	
@@ -381,7 +390,7 @@ static XMPPCapabilitiesCoreDataStorage *sharedInstance;
                   xmppStream:(XMPPStream *)stream
 {
 	// By design this method should not be invoked from the storageQueue.
-//	NSAssert(!dispatch_get_specific(storageQueueTag), @"Invoked on incorrect queue");
+	NSAssert(!dispatch_get_specific(storageQueueTag), @"Invoked on incorrect queue");
 	
 	XMPPLogTrace();
 	
@@ -467,7 +476,7 @@ static XMPPCapabilitiesCoreDataStorage *sharedInstance;
 		NSFetchRequest *fetchRequest = [[NSFetchRequest alloc] init];
 		[fetchRequest setEntity:entity];
 		[fetchRequest setPredicate:predicate];
-		[fetchRequest setFetchBatchSize:self.saveThreshold];
+		[fetchRequest setFetchBatchSize:self->saveThreshold];
 		
 		NSArray *results = [[self managedObjectContext] executeFetchRequest:fetchRequest error:nil];
 		
@@ -477,7 +486,7 @@ static XMPPCapabilitiesCoreDataStorage *sharedInstance;
 		{
 			resource.caps = caps;
 			
-			if (++unsavedCount >= self.saveThreshold)
+			if (++unsavedCount >= self->saveThreshold)
 			{
 				[self save];
 			}
@@ -489,7 +498,7 @@ static XMPPCapabilitiesCoreDataStorage *sharedInstance;
 - (void)setCapabilities:(NSXMLElement *)capabilities forJID:(XMPPJID *)jid xmppStream:(XMPPStream *)stream
 {
 	// By design this method should not be invoked from the storageQueue.
-//	NSAssert(!dispatch_get_specific(storageQueueTag), @"Invoked on incorrect queue");
+	NSAssert(!dispatch_get_specific(storageQueueTag), @"Invoked on incorrect queue");
 	
 	XMPPLogTrace();
 	

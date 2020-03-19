@@ -14,8 +14,8 @@
   static const int xmppLogLevel = XMPP_LOG_LEVEL_WARN;
 #endif
 
-//#define AssertPrivateQueue() \
-//            NSAssert(dispatch_get_specific(storageQueueTag), @"Private method: MUST run on storageQueue");
+#define AssertPrivateQueue() \
+            NSAssert(dispatch_get_specific(storageQueueTag), @"Private method: MUST run on storageQueue");
 
 @interface XMPPRoomCoreDataStorage ()
 {
@@ -100,70 +100,70 @@ static XMPPRoomCoreDataStorage *sharedInstance;
 {
 	__block NSString *result = nil;
 	
-//	dispatch_block_t block = ^{
-//		result = self->messageEntityName;
-//	};
-//
-//	if (dispatch_get_specific(storageQueueTag))
-//		block();
-//	else
-//		dispatch_sync(storageQueue, block);
+	dispatch_block_t block = ^{
+		result = self->messageEntityName;
+	};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_sync(storageQueue, block);
 	
 	return result;
 }
 
 - (void)setMessageEntityName:(NSString *)newMessageEntityName
 {
-//	dispatch_block_t block = ^{
-//		self->messageEntityName = newMessageEntityName;
-//	};
-//
-//	if (dispatch_get_specific(storageQueueTag))
-//		block();
-//	else
-//		dispatch_async(storageQueue, block);
+	dispatch_block_t block = ^{
+		self->messageEntityName = newMessageEntityName;
+	};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_async(storageQueue, block);
 }
 
 - (NSString *)occupantEntityName
 {
 	__block NSString *result = nil;
 	
-//	dispatch_block_t block = ^{
-//		result = self->occupantEntityName;
-//	};
-//
-//	if (dispatch_get_specific(storageQueueTag))
-//		block();
-//	else
-//		dispatch_sync(storageQueue, block);
+	dispatch_block_t block = ^{
+		result = self->occupantEntityName;
+	};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_sync(storageQueue, block);
 	
 	return result;
 }
 
 - (void)setOccupantEntityName:(NSString *)newOccupantEntityName
 {
-//	dispatch_block_t block = ^{
-//		self->occupantEntityName = newOccupantEntityName;
-//	};
-//
-//	if (dispatch_get_specific(storageQueueTag))
-//		block();
-//	else
-//		dispatch_async(storageQueue, block);
+	dispatch_block_t block = ^{
+		self->occupantEntityName = newOccupantEntityName;
+	};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_async(storageQueue, block);
 }
 
 - (NSTimeInterval)maxMessageAge
 {
 	__block NSTimeInterval result = 0;
 	
-//	dispatch_block_t block = ^{
-//		result = self->maxMessageAge;
-//	};
-//
-//	if (dispatch_get_specific(storageQueueTag))
-//		block();
-//	else
-//		dispatch_sync(storageQueue, block);
+	dispatch_block_t block = ^{
+		result = self->maxMessageAge;
+	};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_sync(storageQueue, block);
 	
 	return result;
 }
@@ -227,22 +227,25 @@ static XMPPRoomCoreDataStorage *sharedInstance;
 				[self createAndStartDeleteTimer];
 		}
 	}};
-
-	[self scheduleBlock:block];
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_async(storageQueue, block);
 }
 
 - (NSTimeInterval)deleteInterval
 {
 	__block NSTimeInterval result = 0;
 	
-//	dispatch_block_t block = ^{
-//		result = self->deleteInterval;
-//	};
-//
-//	if (dispatch_get_specific(storageQueueTag))
-//		block();
-//	else
-//		dispatch_sync(storageQueue, block);
+	dispatch_block_t block = ^{
+		result = self->deleteInterval;
+	};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_sync(storageQueue, block);
 	
 	return result;
 }
@@ -295,23 +298,38 @@ static XMPPRoomCoreDataStorage *sharedInstance;
 			[self destroyDeleteTimer];
 		}
 	}};
-
-	[self scheduleBlock:block];
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_async(storageQueue, block);
 }
 
 - (void)pauseOldMessageDeletionForRoom:(XMPPJID *)roomJID
 {
-	[self scheduleBlock:^{
+	dispatch_block_t block = ^{ @autoreleasepool {
+		
 		[self->pausedMessageDeletion addObject:[roomJID bareJID]];
-	}];
+	}};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_async(storageQueue, block);
 }
 
 - (void)resumeOldMessageDeletionForRoom:(XMPPJID *)roomJID
 {
-	[self scheduleBlock:^{
+	dispatch_block_t block = ^{ @autoreleasepool {
+		
 		[self->pausedMessageDeletion removeObject:[roomJID bareJID]];
 		[self performDelete];
-	}];
+	}};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_async(storageQueue, block);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -352,7 +370,7 @@ static XMPPRoomCoreDataStorage *sharedInstance;
 	NSFetchRequest *fetchRequest = [[NSFetchRequest alloc] init];
 	[fetchRequest setEntity:messageEntity];
 	[fetchRequest setPredicate:predicate];
-	[fetchRequest setFetchBatchSize:self.saveThreshold];
+	[fetchRequest setFetchBatchSize:saveThreshold];
 	
 	NSError *error = nil;
 	NSArray *oldMessages = [moc executeFetchRequest:fetchRequest error:&error];
@@ -368,7 +386,7 @@ static XMPPRoomCoreDataStorage *sharedInstance;
 	{
 		[moc deleteObject:oldMessage];
 		
-		if (++unsavedCount >= self.saveThreshold)
+		if (++unsavedCount >= saveThreshold)
 		{
 			[self save];
 			unsavedCount = 0;
@@ -408,36 +426,36 @@ static XMPPRoomCoreDataStorage *sharedInstance;
 
 - (void)createAndStartDeleteTimer
 {
-//	if ((deleteTimer == NULL) && (deleteInterval > 0.0) && (maxMessageAge > 0.0))
-//	{
-//		deleteTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, storageQueue);
-//
-//		dispatch_source_set_event_handler(deleteTimer, ^{ @autoreleasepool {
-//
-//			[self performDelete];
-//
-//		}});
-//
-//		[self updateDeleteTimer];
-//
-//		if(deleteTimer != NULL)
-//		{
-//			dispatch_resume(deleteTimer);
-//		}
-//	}
+	if ((deleteTimer == NULL) && (deleteInterval > 0.0) && (maxMessageAge > 0.0))
+	{
+		deleteTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, storageQueue);
+		
+		dispatch_source_set_event_handler(deleteTimer, ^{ @autoreleasepool {
+			
+			[self performDelete];
+			
+		}});
+		
+		[self updateDeleteTimer];
+		
+		if(deleteTimer != NULL)
+		{
+			dispatch_resume(deleteTimer);
+		}
+	}
 }
 
 - (void)clearAllOccupantsFromRoom:(XMPPJID *)roomJID
 {
 	XMPPLogTrace();
-//	AssertPrivateQueue();
+	AssertPrivateQueue();
 	
 	NSManagedObjectContext *moc = [self managedObjectContext];
 	NSEntityDescription *entity = [self occupantEntity:moc];
 	
 	NSFetchRequest *fetchRequest = [[NSFetchRequest alloc] init];
 	[fetchRequest setEntity:entity];
-	[fetchRequest setFetchBatchSize:self.saveThreshold];
+	[fetchRequest setFetchBatchSize:saveThreshold];
 	
 	if (roomJID)
 	{
@@ -455,7 +473,7 @@ static XMPPRoomCoreDataStorage *sharedInstance;
 	{
 		[moc deleteObject:occupant];
 		
-		if (++unsavedCount >= self.saveThreshold)
+		if (++unsavedCount >= saveThreshold)
 		{
 			[self save];
 			unsavedCount = 0;
@@ -788,51 +806,51 @@ static XMPPRoomCoreDataStorage *sharedInstance;
 	
 	__block NSDate *result = nil;
 	
-//	dispatch_block_t block = ^{ @autoreleasepool {
-//		
-//		NSManagedObjectContext *moc = inMoc ? : [self managedObjectContext];
-//		
-//		NSEntityDescription *entity = [self messageEntity:moc];
-//		
-//		NSPredicate *predicate;
-//		if (xmppStream)
-//		{
-//			NSString *streamBareJidStr = [[self myJIDForXMPPStream:xmppStream] bare];
-//			
-//			NSString *predicateFormat = @"roomJIDStr == %@ AND streamBareJidStr == %@";
-//			predicate = [NSPredicate predicateWithFormat:predicateFormat, roomJID.bare, streamBareJidStr];
-//		}
-//		else
-//		{
-//			predicate = [NSPredicate predicateWithFormat:@"roomJIDStr == %@", roomJID.bare];
-//		}
-//		
-//		NSSortDescriptor *sortDescriptor = [NSSortDescriptor sortDescriptorWithKey:@"localTimestamp" ascending:NO];
-//		NSArray *sortDescriptors = @[sortDescriptor];
-//		
-//		NSFetchRequest *fetchRequest = [[NSFetchRequest alloc] init];
-//		[fetchRequest setEntity:entity];
-//		[fetchRequest setPredicate:predicate];
-//		[fetchRequest setSortDescriptors:sortDescriptors];
-//		[fetchRequest setFetchLimit:1];
-//		
-//		NSError *error = nil;
-//		XMPPRoomMessageCoreDataStorageObject *message = [[moc executeFetchRequest:fetchRequest error:&error] lastObject];
-//
-//		if (error)
-//		{
-//			XMPPLogError(@"%@: %@ - fetchRequest error: %@", THIS_FILE, THIS_METHOD, error);
-//		}
-//		else
-//		{
-//			result = [message.localTimestamp copy];
-//		}
-//	}};
-//	
-//	if (inMoc == nil)
-//		dispatch_sync(storageQueue, block);
-//	else
-//		block();
+	dispatch_block_t block = ^{ @autoreleasepool {
+		
+		NSManagedObjectContext *moc = inMoc ? : [self managedObjectContext];
+		
+		NSEntityDescription *entity = [self messageEntity:moc];
+		
+		NSPredicate *predicate;
+		if (xmppStream)
+		{
+			NSString *streamBareJidStr = [[self myJIDForXMPPStream:xmppStream] bare];
+			
+			NSString *predicateFormat = @"roomJIDStr == %@ AND streamBareJidStr == %@";
+			predicate = [NSPredicate predicateWithFormat:predicateFormat, roomJID.bare, streamBareJidStr];
+		}
+		else
+		{
+			predicate = [NSPredicate predicateWithFormat:@"roomJIDStr == %@", roomJID.bare];
+		}
+		
+		NSSortDescriptor *sortDescriptor = [NSSortDescriptor sortDescriptorWithKey:@"localTimestamp" ascending:NO];
+		NSArray *sortDescriptors = @[sortDescriptor];
+		
+		NSFetchRequest *fetchRequest = [[NSFetchRequest alloc] init];
+		[fetchRequest setEntity:entity];
+		[fetchRequest setPredicate:predicate];
+		[fetchRequest setSortDescriptors:sortDescriptors];
+		[fetchRequest setFetchLimit:1];
+		
+		NSError *error = nil;
+		XMPPRoomMessageCoreDataStorageObject *message = [[moc executeFetchRequest:fetchRequest error:&error] lastObject];
+
+		if (error)
+		{
+			XMPPLogError(@"%@: %@ - fetchRequest error: %@", THIS_FILE, THIS_METHOD, error);
+		}
+		else
+		{
+			result = [message.localTimestamp copy];
+		}
+	}};
+	
+	if (inMoc == nil)
+		dispatch_sync(storageQueue, block);
+	else
+		block();
 	
 	return result;
 }
