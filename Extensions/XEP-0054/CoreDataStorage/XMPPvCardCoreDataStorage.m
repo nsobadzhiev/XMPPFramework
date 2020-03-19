@@ -63,8 +63,8 @@ static XMPPvCardCoreDataStorage *sharedInstance;
 
 - (void)commonInit
 {
-    self.autoAllowExternalBinaryDataStorage = YES;
-    self.autoRecreateDatabaseFile = YES;
+    autoAllowExternalBinaryDataStorage = YES;
+    autoRecreateDatabaseFile = YES;
     [super commonInit];
 }
 

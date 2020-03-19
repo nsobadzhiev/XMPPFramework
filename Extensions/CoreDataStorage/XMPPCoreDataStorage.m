@@ -22,6 +22,41 @@
 
 @implementation XMPPCoreDataStorage
 
+static NSMutableSet *databaseFileNames;
+
++ (void)initialize
+{
+	static dispatch_once_t onceToken;
+	dispatch_once(&onceToken, ^{
+		
+		databaseFileNames = [[NSMutableSet alloc] init];
+	});
+}
+
++ (BOOL)registerDatabaseFileName:(NSString *)dbFileName
+{
+	BOOL result = NO;
+	
+	@synchronized(databaseFileNames)
+	{
+		if (![databaseFileNames containsObject:dbFileName])
+		{
+			[databaseFileNames addObject:dbFileName];
+			result = YES;
+		}
+	}
+	
+	return result;
+}
+
++ (void)unregisterDatabaseFileName:(NSString *)dbFileName
+{
+	@synchronized(databaseFileNames)
+	{
+		[databaseFileNames removeObject:dbFileName];
+	}
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma mark Override Me
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -108,27 +143,27 @@
 			
     NSPersistentStore *persistentStore;
 	
-    if (storePath)
-    {
-        // SQLite persistent store
-        
-        NSURL *storeUrl = [NSURL fileURLWithPath:storePath];
-        
-        persistentStore = [self.persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType
-                                                                        configuration:nil
-                                                                                  URL:storeUrl
-                                                                              options:storeOptions
-                                                                                error:errorPtr];
-    }
-    else
-    {
-        // In-Memory persistent store
-        
-        persistentStore = [self.persistentStoreCoordinator addPersistentStoreWithType:NSInMemoryStoreType
-                                                                        configuration:nil
-                                                                                  URL:nil
-                                                                              options:nil
-                                                                                error:errorPtr];
+	if (storePath)
+	{
+		// SQLite persistent store
+		
+		NSURL *storeUrl = [NSURL fileURLWithPath:storePath];
+		
+		persistentStore = [persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType
+		                                                           configuration:nil
+		                                                                     URL:storeUrl
+		                                                                 options:storeOptions
+		                                                                   error:errorPtr];
+	}
+	else
+	{
+		// In-Memory persistent store
+		
+		persistentStore = [persistentStoreCoordinator addPersistentStoreWithType:NSInMemoryStoreType
+		                                                           configuration:nil
+		                                                                     URL:nil
+		                                                                 options:nil
+		                                                                   error:errorPtr];
 	}
 	
     return persistentStore != nil;
@@ -202,23 +237,22 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 @synthesize databaseFileName;
-@synthesize persistentStoreCoordinator = _persistentStoreCoordinator;
 @synthesize storeOptions;
-@synthesize saveThreshold;
-@synthesize autoRemovePreviousDatabaseFile;
-@synthesize autoRecreateDatabaseFile;
-@synthesize autoAllowExternalBinaryDataStorage;
-@synthesize managedObjectModel = _managedObjectModel;
 
 - (void)commonInit
 {
-	self.saveThreshold = 500;
+	saveThreshold = 500;
+	
+	storageQueue = dispatch_queue_create(class_getName([self class]), NULL);
+	
+	storageQueueTag = &storageQueueTag;
+	dispatch_queue_set_specific(storageQueue, storageQueueTag, storageQueueTag, NULL);
 	
 	myJidCache = [[NSMutableDictionary alloc] init];
-
-	[self setupManagedObjectModel];
-    [self setupPersistentStoreCoordinator];
-
+    
+    willSaveManagedObjectContextBlocks = [[NSMutableArray alloc] init];
+    didSaveManagedObjectContextBlocks = [[NSMutableArray alloc] init];
+	
 	[[NSNotificationCenter defaultCenter] addObserver:self
 	                                         selector:@selector(updateJidCache:)
 	                                             name:XMPPStreamDidChangeMyJIDNotification
@@ -244,7 +278,13 @@
         else
             storeOptions = [self defaultStoreOptions];
 		
+		if (![[self class] registerDatabaseFileName:databaseFileName])
+		{
+			return nil;
+		}
+		
 		[self commonInit];
+		NSAssert(storageQueue != NULL, @"Subclass forgot to invoke [super commonInit]");
 	}
 	return self;
 }
@@ -254,6 +294,7 @@
 	if ((self = [super init]))
 	{
 		[self commonInit];
+		NSAssert(storageQueue != NULL, @"Subclass forgot to invoke [super commonInit]");
 	}
 	return self;
 }
@@ -268,120 +309,46 @@
 	NSParameterAssert(aParent != nil);
 	NSParameterAssert(queue != NULL);
 	
+	if (queue == storageQueue)
+	{
+		// This class is designed to be run on a separate dispatch queue from its parent.
+		// This allows us to optimize the database save operations by buffering them,
+		// and executing them when demand on the storage instance is low.
+		
+		return NO;
+	}
+	
 	return YES;
 }
 
-- (void)setupManagedObjectModel {
-    NSString *momName = [self managedObjectModelName];
-
-    XMPPLogVerbose(@"%@: Creating managedObjectModel (%@)", [self class], momName);
-
-    NSString *momPath = [[self managedObjectModelBundle] pathForResource:momName ofType:@"mom"];
-    if (momPath == nil)
-    {
-        // The model may be versioned or created with Xcode 4, try momd as an extension.
-        momPath = [[self managedObjectModelBundle] pathForResource:momName ofType:@"momd"];
-    }
-
-    if (momPath)
-    {
-        // If path is nil, then NSURL or NSManagedObjectModel will throw an exception
-
-        NSURL *momUrl = [NSURL fileURLWithPath:momPath];
-
-        _managedObjectModel = [[[NSManagedObjectModel alloc] initWithContentsOfURL:momUrl] copy];
-    }
-    else
-    {
-        XMPPLogWarn(@"%@: Couldn't find managedObjectModel file - %@", [self class], momName);
-    }
-
-    if(self.autoAllowExternalBinaryDataStorage)
-    {
-        NSArray *entities = [self.managedObjectModel entities];
-
-        for(NSEntityDescription *entity in entities)
-        {
-            NSDictionary *attributesByName = [entity attributesByName];
-
-            [attributesByName enumerateKeysAndObjectsUsingBlock:^(id key, id obj, BOOL *stop) {
-
-                if([obj attributeType] == NSBinaryDataAttributeType)
-                {
-                    [obj setAllowsExternalBinaryDataStorage:YES];
-                }
-
-            }];
-        }
-
-    }
+- (NSUInteger)saveThreshold
+{
+	if (dispatch_get_specific(storageQueueTag))
+	{
+		return saveThreshold;
+	}
+	else
+	{
+		__block NSUInteger result;
+		
+		dispatch_sync(storageQueue, ^{
+			result = self->saveThreshold;
+		});
+		
+		return result;
+	}
 }
 
-- (void)setupPersistentStoreCoordinator {
-    NSManagedObjectModel *mom = [self managedObjectModel];
-    if (mom == nil)
-    {
-        return;
-    }
-
-    XMPPLogVerbose(@"%@: Creating persistentStoreCoordinator", [self class]);
-
-    _persistentStoreCoordinator = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:mom];
-
-    if (self.databaseFileName)
-    {
-        // SQLite persistent store
-
-        NSString *docsPath = [self persistentStoreDirectory];
-        NSString *storePath = [docsPath stringByAppendingPathComponent:self.databaseFileName];
-        if (storePath)
-        {
-            // If storePath is nil, then NSURL will throw an exception
-
-            if(self.autoRemovePreviousDatabaseFile)
-            {
-                if ([[NSFileManager defaultManager] fileExistsAtPath:storePath])
-                {
-                    [[NSFileManager defaultManager] removeItemAtPath:storePath error:nil];
-                }
-            }
-
-            [self willCreatePersistentStoreWithPath:storePath options:self.storeOptions];
-
-            NSError *error = nil;
-
-            BOOL didAddPersistentStore = [self addPersistentStoreWithPath:storePath options:self.storeOptions error:&error];
-
-            if(self->autoRecreateDatabaseFile && !didAddPersistentStore)
-            {
-                [[NSFileManager defaultManager] removeItemAtPath:storePath error:NULL];
-
-                didAddPersistentStore = [self addPersistentStoreWithPath:storePath options:self.storeOptions error:&error];
-            }
-
-            if (!didAddPersistentStore)
-            {
-                [self didNotAddPersistentStoreWithPath:storePath options:self.storeOptions error:error];
-            }
-        }
-        else
-        {
-            XMPPLogWarn(@"%@: Error creating persistentStoreCoordinator - Nil persistentStoreDirectory",
-                        [self class]);
-        }
-    }
-    else
-    {
-        // In-Memory persistent store
-
-        [self willCreatePersistentStoreWithPath:nil options:self->storeOptions];
-
-        NSError *error = nil;
-        if (![self addPersistentStoreWithPath:nil options:self->storeOptions error:&error])
-        {
-            [self didNotAddPersistentStoreWithPath:nil options:self->storeOptions error:error];
-        }
-    }
+- (void)setSaveThreshold:(NSUInteger)newSaveThreshold
+{
+	dispatch_block_t block = ^{
+		self->saveThreshold = newSaveThreshold;
+	};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_async(storageQueue, block);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -403,23 +370,26 @@
 	if (stream == nil) return nil;
 	
 	__block XMPPJID *result = nil;
-
-	[self executeBlock:^{
-		@autoreleasepool {
-			NSNumber *key = [NSNumber xmpp_numberWithPtr:(__bridge void *)stream];
-
-			result = (XMPPJID *) self->myJidCache[key];
-			if (!result)
+	
+	dispatch_block_t block = ^{ @autoreleasepool {
+		
+		NSNumber *key = [NSNumber xmpp_numberWithPtr:(__bridge void *)stream];
+		
+		result = (XMPPJID *) self->myJidCache[key];
+		if (!result)
+		{
+			result = [stream myJID];
+			if (result)
 			{
-				result = [stream myJID];
-				if (result)
-				{
-					self->myJidCache[key] = result;
-				}
+				self->myJidCache[key] = result;
 			}
 		}
-	}];
-
+	}};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_sync(storageQueue, block);
 	
 	return result;
 }
@@ -437,32 +407,36 @@
 	// In this case, they are delivered on xmppStream's internal processing queue.
 	
 	XMPPStream *stream = (XMPPStream *)[notification object];
-
-	[self scheduleBlock:^{
-		@autoreleasepool {
-			NSNumber *key = [NSNumber xmpp_numberWithPtr:(__bridge void *)stream];
-			XMPPJID *cachedJID = self->myJidCache[key];
-
-			if (cachedJID)
+	
+	dispatch_block_t block = ^{ @autoreleasepool {
+		
+		NSNumber *key = [NSNumber xmpp_numberWithPtr:(__bridge void *)stream];
+		XMPPJID *cachedJID = self->myJidCache[key];
+		
+		if (cachedJID)
+		{
+			XMPPJID *newJID = [stream myJID];
+			
+			if (newJID)
 			{
-				XMPPJID *newJID = [stream myJID];
-
-				if (newJID)
+				if (![cachedJID isEqualToJID:newJID])
 				{
-					if (![cachedJID isEqualToJID:newJID])
-					{
-						self->myJidCache[key] = newJID;
-						[self didChangeCachedMyJID:newJID forXMPPStream:stream];
-					}
-				}
-				else
-				{
-					[self->myJidCache removeObjectForKey:key];
-					[self didChangeCachedMyJID:nil forXMPPStream:stream];
+					self->myJidCache[key] = newJID;
+					[self didChangeCachedMyJID:newJID forXMPPStream:stream];
 				}
 			}
+			else
+			{
+				[self->myJidCache removeObjectForKey:key];
+				[self didChangeCachedMyJID:nil forXMPPStream:stream];
+			}
 		}
-	}];
+	}};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_async(storageQueue, block);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -494,6 +468,172 @@
     return persistentStoreDirectory;
 }
 
+- (NSManagedObjectModel *)managedObjectModel
+{
+	// This is a public method.
+	// It may be invoked on any thread/queue.
+	
+	__block NSManagedObjectModel *result = nil;
+	
+	dispatch_block_t block = ^{ @autoreleasepool {
+		
+		if (self->managedObjectModel)
+		{
+			result = self->managedObjectModel;
+			return;
+		}
+		        
+		NSString *momName = [self managedObjectModelName];
+		
+		XMPPLogVerbose(@"%@: Creating managedObjectModel (%@)", [self class], momName);
+		
+		NSString *momPath = [[self managedObjectModelBundle] pathForResource:momName ofType:@"mom"];
+		if (momPath == nil)
+		{
+			// The model may be versioned or created with Xcode 4, try momd as an extension.
+			momPath = [[self managedObjectModelBundle] pathForResource:momName ofType:@"momd"];
+		}
+    
+		if (momPath)
+		{
+			// If path is nil, then NSURL or NSManagedObjectModel will throw an exception
+			
+			NSURL *momUrl = [NSURL fileURLWithPath:momPath];
+			
+			self->managedObjectModel = [[[NSManagedObjectModel alloc] initWithContentsOfURL:momUrl] copy];
+		}
+		else
+		{
+			XMPPLogWarn(@"%@: Couldn't find managedObjectModel file - %@", [self class], momName);
+		}
+        
+		if([NSAttributeDescription instancesRespondToSelector:@selector(setAllowsExternalBinaryDataStorage:)])
+		{
+			if(self->autoAllowExternalBinaryDataStorage)
+			{
+				NSArray *entities = [self->managedObjectModel entities];
+
+				for(NSEntityDescription *entity in entities)
+				{
+					NSDictionary *attributesByName = [entity attributesByName];
+
+					[attributesByName enumerateKeysAndObjectsUsingBlock:^(id key, id obj, BOOL *stop) {
+
+						if([obj attributeType] == NSBinaryDataAttributeType)
+						{
+							[obj setAllowsExternalBinaryDataStorage:YES];
+						}
+
+					}];
+				}
+
+			}
+            
+        }
+		
+		result = self->managedObjectModel;
+	}};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_sync(storageQueue, block);
+	
+	return result;
+}
+
+- (NSPersistentStoreCoordinator *)persistentStoreCoordinator
+{
+	// This is a public method.
+	// It may be invoked on any thread/queue.
+	
+	__block NSPersistentStoreCoordinator *result = nil;
+	
+	dispatch_block_t block = ^{ @autoreleasepool {
+		
+		if (self->persistentStoreCoordinator)
+		{
+			result = self->persistentStoreCoordinator;
+			return;
+		}
+		
+		NSManagedObjectModel *mom = [self managedObjectModel];
+		if (mom == nil)
+		{
+			return;
+		}
+		
+		XMPPLogVerbose(@"%@: Creating persistentStoreCoordinator", [self class]);
+		
+		self->persistentStoreCoordinator = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:mom];
+		
+		if (self->databaseFileName)
+		{
+			// SQLite persistent store
+			
+			NSString *docsPath = [self persistentStoreDirectory];
+			NSString *storePath = [docsPath stringByAppendingPathComponent:self->databaseFileName];
+			if (storePath)
+			{
+				// If storePath is nil, then NSURL will throw an exception
+
+				if(self->autoRemovePreviousDatabaseFile)
+				{
+					if ([[NSFileManager defaultManager] fileExistsAtPath:storePath])
+					{
+						[[NSFileManager defaultManager] removeItemAtPath:storePath error:nil];
+					}
+				}
+				
+				[self willCreatePersistentStoreWithPath:storePath options:self->storeOptions];
+				
+				NSError *error = nil;
+				
+				BOOL didAddPersistentStore = [self addPersistentStoreWithPath:storePath options:self->storeOptions error:&error];
+				
+				if(self->autoRecreateDatabaseFile && !didAddPersistentStore)
+				{
+					[[NSFileManager defaultManager] removeItemAtPath:storePath error:NULL];
+					
+					didAddPersistentStore = [self addPersistentStoreWithPath:storePath options:self->storeOptions error:&error];
+				}
+				
+				if (!didAddPersistentStore)
+				{
+					[self didNotAddPersistentStoreWithPath:storePath options:self->storeOptions error:error];
+				}
+			}
+			else
+			{
+				XMPPLogWarn(@"%@: Error creating persistentStoreCoordinator - Nil persistentStoreDirectory",
+							[self class]);
+			}
+		}
+		else
+		{
+			// In-Memory persistent store
+			
+			[self willCreatePersistentStoreWithPath:nil options:self->storeOptions];
+			
+			NSError *error = nil;
+			if (![self addPersistentStoreWithPath:nil options:self->storeOptions error:&error])
+			{
+				[self didNotAddPersistentStoreWithPath:nil options:self->storeOptions error:error];
+			}
+		}
+		
+		result = self->persistentStoreCoordinator;
+		
+	}};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_sync(storageQueue, block);
+
+    return result;
+}
+
 - (NSManagedObjectContext *)managedObjectContext
 {
 	// This is a private method.
@@ -512,7 +652,7 @@
 	// then you need to go read the documentation for core data,
 	// specifically the section entitled "Concurrency with Core Data".
 	// 
-//	NSAssert(dispatch_get_specific(storageQueueTag), @"Invoked on incorrect queue");
+	NSAssert(dispatch_get_specific(storageQueueTag), @"Invoked on incorrect queue");
 	// 
 	// Do NOT remove the assert statment above!
 	// Read the comments above!
@@ -530,7 +670,7 @@
 		
 		if ([NSManagedObjectContext instancesRespondToSelector:@selector(initWithConcurrencyType:)])
 			managedObjectContext =
-			    [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
+			    [[NSManagedObjectContext alloc] initWithConcurrencyType:NSConfinementConcurrencyType];
 		else
 			managedObjectContext = [[NSManagedObjectContext alloc] init];
 		
@@ -573,15 +713,19 @@
 	{
 		XMPPLogVerbose(@"%@: Creating mainThreadManagedObjectContext", [self class]);
 		
-
-		mainThreadManagedObjectContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSMainQueueConcurrencyType];
-		mainThreadManagedObjectContext.parentContext = [self managedObjectContext];
+		if ([NSManagedObjectContext instancesRespondToSelector:@selector(initWithConcurrencyType:)])
+			mainThreadManagedObjectContext =
+			    [[NSManagedObjectContext alloc] initWithConcurrencyType:NSMainQueueConcurrencyType];
+		else
+			mainThreadManagedObjectContext = [[NSManagedObjectContext alloc] init];
+		
+		mainThreadManagedObjectContext.persistentStoreCoordinator = coordinator;
 		mainThreadManagedObjectContext.undoManager = nil;
 		
-//		[[NSNotificationCenter defaultCenter] addObserver:self
-//		                                         selector:@selector(managedObjectContextDidSave:)
-//		                                             name:NSManagedObjectContextDidSaveNotification
-//		                                           object:nil];
+		[[NSNotificationCenter defaultCenter] addObserver:self
+		                                         selector:@selector(managedObjectContextDidSave:)
+		                                             name:NSManagedObjectContextDidSaveNotification
+		                                           object:nil];
 		
 		// Todo: If we knew that our private managedObjectContext was going to be the only one writing to the database,
 		// then a small optimization would be to use it as the object when registering above.
@@ -590,27 +734,111 @@
 	return mainThreadManagedObjectContext;
 }
 
-//- (void)managedObjectContextDidSave:(NSNotification *)notification
-//{
-//	NSManagedObjectContext *sender = (NSManagedObjectContext *)[notification object];
-//	
-//	if ((sender != mainThreadManagedObjectContext) &&
-//	    (sender.persistentStoreCoordinator == mainThreadManagedObjectContext.persistentStoreCoordinator))
-//	{
-//		XMPPLogVerbose(@"%@: %@ - Merging changes into mainThreadManagedObjectContext", THIS_FILE, THIS_METHOD);
-//		
-//		dispatch_async(dispatch_get_main_queue(), ^{
-//            
-//            // http://stackoverflow.com/questions/3923826/nsfetchedresultscontroller-with-predicate-ignores-changes-merged-from-different
-//			for (NSManagedObject *object in [notification userInfo][NSUpdatedObjectsKey]) {
-//				[[self.mainThreadManagedObjectContext objectWithID:[object objectID]] willAccessValueForKey:nil];
-//			}
-//			
-//			[self.mainThreadManagedObjectContext mergeChangesFromContextDidSaveNotification:notification];
-//			[self mainThreadManagedObjectContextDidMergeChanges];
-//		});
-//    }
-//}
+- (void)managedObjectContextDidSave:(NSNotification *)notification
+{
+	NSManagedObjectContext *sender = (NSManagedObjectContext *)[notification object];
+	
+	if ((sender != mainThreadManagedObjectContext) &&
+	    (sender.persistentStoreCoordinator == mainThreadManagedObjectContext.persistentStoreCoordinator))
+	{
+		XMPPLogVerbose(@"%@: %@ - Merging changes into mainThreadManagedObjectContext", THIS_FILE, THIS_METHOD);
+		
+		dispatch_async(dispatch_get_main_queue(), ^{
+            
+            // http://stackoverflow.com/questions/3923826/nsfetchedresultscontroller-with-predicate-ignores-changes-merged-from-different
+			for (NSManagedObject *object in [notification userInfo][NSUpdatedObjectsKey]) {
+				[[self->mainThreadManagedObjectContext objectWithID:[object objectID]] willAccessValueForKey:nil];
+			}
+			
+			[self->mainThreadManagedObjectContext mergeChangesFromContextDidSaveNotification:notification];
+			[self mainThreadManagedObjectContextDidMergeChanges];
+		});
+    }
+}
+
+- (BOOL)autoRemovePreviousDatabaseFile
+{
+	__block BOOL result = NO;
+	
+	dispatch_block_t block = ^{ @autoreleasepool {
+		result = self->autoRemovePreviousDatabaseFile;
+	}};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_sync(storageQueue, block);
+	
+	return result;
+}
+
+- (void)setAutoRemovePreviousDatabaseFile:(BOOL)flag
+{
+	dispatch_block_t block = ^{
+		self->autoRemovePreviousDatabaseFile = flag;
+	};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_sync(storageQueue, block);
+}
+
+- (BOOL)autoRecreateDatabaseFile
+{
+	__block BOOL result = NO;
+	
+	dispatch_block_t block = ^{ @autoreleasepool {
+		result = self->autoRecreateDatabaseFile;
+	}};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_sync(storageQueue, block);
+	
+	return result;
+}
+
+- (void)setAutoRecreateDatabaseFile:(BOOL)flag
+{
+	dispatch_block_t block = ^{
+		self->autoRecreateDatabaseFile = flag;
+	};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_sync(storageQueue, block);
+}
+
+- (BOOL)autoAllowExternalBinaryDataStorage
+{
+	__block BOOL result = NO;
+	
+	dispatch_block_t block = ^{ @autoreleasepool {
+		result = self->autoAllowExternalBinaryDataStorage;
+	}};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_sync(storageQueue, block);
+	
+	return result;
+}
+
+- (void)setAutoAllowExternalBinaryDataStorage:(BOOL)flag
+{
+	dispatch_block_t block = ^{
+		self->autoAllowExternalBinaryDataStorage = flag;
+	};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_sync(storageQueue, block);	
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma mark Utilities
@@ -635,18 +863,36 @@
 	// So there's no need for us to do it here, especially since this method is usually
 	// called from maybeSave below, which already does this check.
     
+    for(void (^block)(void) in willSaveManagedObjectContextBlocks) {
+        block();
+    }
+    
+    [willSaveManagedObjectContextBlocks removeAllObjects];
+    
 	NSError *error = nil;
-	if (![[self managedObjectContext] save:&error])
+	if ([[self managedObjectContext] save:&error])
+	{
+		saveCount++;
+        
+        for(void (^block)(void) in didSaveManagedObjectContextBlocks) {
+            block();
+        }
+        
+        [didSaveManagedObjectContextBlocks removeAllObjects];
+	}
+	else
 	{
 		XMPPLogWarn(@"%@: Error saving - %@ %@", [self class], error, [error userInfo]);
 		
 		[[self managedObjectContext] rollback];
+        
+        [didSaveManagedObjectContextBlocks removeAllObjects];
 	}
 }
 
 - (void)maybeSave:(int32_t)currentPendingRequests
 {
-//	NSAssert(dispatch_get_specific(storageQueueTag), @"Invoked on incorrect queue");
+	NSAssert(dispatch_get_specific(storageQueueTag), @"Invoked on incorrect queue");
 	
 	
 	if ([[self managedObjectContext] hasChanges])
@@ -684,7 +930,7 @@
 	// If you remove the assert statement below, you are destroying the sole purpose for this class,
 	// which is to optimize the disk IO by buffering save operations.
 	// 
-//	NSAssert(!dispatch_get_specific(storageQueueTag), @"Invoked on incorrect queue");
+	NSAssert(!dispatch_get_specific(storageQueueTag), @"Invoked on incorrect queue");
 	// 
 	// For a full discussion of this method, please see XMPPCoreDataStorageProtocol.h
 	//
@@ -692,11 +938,19 @@
 	//          ^
 	
 	OSAtomicIncrement32(&pendingRequests);
-
-	[[self managedObjectContext] performBlockAndWait:^{
+	dispatch_sync(storageQueue, ^{ @autoreleasepool {
+		
 		block();
-		[self maybeSave:OSAtomicDecrement32(&self->pendingRequests)];
-	}];
+		
+		// Since this is a synchronous request, we want to return as quickly as possible.
+		// So we delay the maybeSave operation til later.
+		
+		dispatch_async(self->storageQueue, ^{ @autoreleasepool {
+			
+			[self maybeSave:OSAtomicDecrement32(&self->pendingRequests)];
+		}});
+		
+	}});
 }
 
 - (void)scheduleBlock:(dispatch_block_t)block
@@ -706,7 +960,7 @@
 	// If you remove the assert statement below, you are destroying the sole purpose for this class,
 	// which is to optimize the disk IO by buffering save operations.
 	// 
-//	NSAssert(!dispatch_get_specific(storageQueueTag), @"Invoked on incorrect queue");
+	NSAssert(!dispatch_get_specific(storageQueueTag), @"Invoked on incorrect queue");
 	// 
 	// For a full discussion of this method, please see XMPPCoreDataStorageProtocol.h
 	// 
@@ -714,11 +968,35 @@
 	//          ^
 	
 	OSAtomicIncrement32(&pendingRequests);
-
-	[[self managedObjectContext] performBlock:^{
+	dispatch_async(storageQueue, ^{ @autoreleasepool {
+		
 		block();
 		[self maybeSave:OSAtomicDecrement32(&self->pendingRequests)];
-	}];
+	}});
+}
+
+- (void)addWillSaveManagedObjectContextBlock:(void (^)(void))willSaveBlock
+{
+    dispatch_block_t block = ^{
+		[self->willSaveManagedObjectContextBlocks addObject:[willSaveBlock copy]];
+	};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_sync(storageQueue, block);
+}
+
+- (void)addDidSaveManagedObjectContextBlock:(void (^)(void))didSaveBlock
+{
+    dispatch_block_t block = ^{
+		[self->didSaveManagedObjectContextBlocks addObject:[didSaveBlock copy]];
+	};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_sync(storageQueue, block);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -728,6 +1006,11 @@
 - (void)dealloc
 {
 	[[NSNotificationCenter defaultCenter] removeObserver:self];
+	
+	if (databaseFileName)
+	{
+		[[self class] unregisterDatabaseFileName:databaseFileName];
+	}
 	
 	#if !OS_OBJECT_USE_OBJC
 	if (storageQueue)

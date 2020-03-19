@@ -107,14 +107,14 @@
 
 	__block NSString *result = nil;
 	
-//	dispatch_block_t block = ^{
-//		result = self->messageEntityName;
-//	};
-//	
-//	if (dispatch_get_specific(storageQueueTag))
-//		block();
-//	else
-//		dispatch_sync(storageQueue, block);
+	dispatch_block_t block = ^{
+		result = self->messageEntityName;
+	};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_sync(storageQueue, block);
 	
 	return result;
 }

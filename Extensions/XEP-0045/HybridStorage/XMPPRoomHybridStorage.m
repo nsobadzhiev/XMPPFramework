@@ -79,7 +79,7 @@ static XMPPRoomHybridStorage *sharedInstance;
 	
 	pausedMessageDeletion = [[NSMutableSet alloc] init];
 	
-	self.autoRecreateDatabaseFile = YES;
+	autoRecreateDatabaseFile = YES;
 }
 
 /**
@@ -121,180 +121,180 @@ static XMPPRoomHybridStorage *sharedInstance;
 {
 	__block NSTimeInterval result = 0;
 	
-//	dispatch_block_t block = ^{
-//		result = self->maxMessageAge;
-//	};
-//
-//	if (dispatch_get_specific(storageQueueTag))
-//		block();
-//	else
-//		dispatch_sync(storageQueue, block);
+	dispatch_block_t block = ^{
+		result = self->maxMessageAge;
+	};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_sync(storageQueue, block);
 	
 	return result;
 }
 
 - (void)setMaxMessageAge:(NSTimeInterval)age
 {
-//	dispatch_block_t block = ^{ @autoreleasepool {
-//
-//		NSTimeInterval oldMaxMessageAge = self->maxMessageAge;
-//		NSTimeInterval newMaxMessageAge = age;
-//
-//		self->maxMessageAge = age;
-//
-//		// There are several cases we need to handle here.
-//		//
-//		// 1. If the maxAge was previously enabled and it just got disabled,
-//		//    then we need to stop the deleteTimer. (And we might as well release it.)
-//		//
-//		// 2. If the maxAge was previously disabled and it just got enabled,
-//		//    then we need to setup the deleteTimer. (Plus we might need to do an immediate delete.)
-//		//
-//		// 3. If the maxAge was increased,
-//		//    then we don't need to do anything.
-//		//
-//		// 4. If the maxAge was decreased,
-//		//    then we should do an immediate delete.
-//
-//		BOOL shouldDeleteNow = NO;
-//
-//		if (oldMaxMessageAge > 0.0)
-//		{
-//			if (newMaxMessageAge <= 0.0)
-//			{
-//				// Handles #1
-//				[self destroyDeleteTimer];
-//			}
-//			else if (oldMaxMessageAge > newMaxMessageAge)
-//			{
-//				// Handles #4
-//				shouldDeleteNow = YES;
-//			}
-//			else
-//			{
-//				// Handles #3
-//				// Nothing to do now
-//			}
-//		}
-//		else if (newMaxMessageAge > 0.0)
-//		{
-//			// Handles #2
-//			shouldDeleteNow = YES;
-//		}
-//
-//		if (shouldDeleteNow)
-//		{
-//			[self performDelete];
-//
-//			if (self->deleteTimer)
-//				[self updateDeleteTimer];
-//			else
-//				[self createAndStartDeleteTimer];
-//		}
-//	}};
-//
-//	if (dispatch_get_specific(storageQueueTag))
-//		block();
-//	else
-//		dispatch_async(storageQueue, block);
+	dispatch_block_t block = ^{ @autoreleasepool {
+		
+		NSTimeInterval oldMaxMessageAge = self->maxMessageAge;
+		NSTimeInterval newMaxMessageAge = age;
+		
+		self->maxMessageAge = age;
+		
+		// There are several cases we need to handle here.
+		// 
+		// 1. If the maxAge was previously enabled and it just got disabled,
+		//    then we need to stop the deleteTimer. (And we might as well release it.)
+		// 
+		// 2. If the maxAge was previously disabled and it just got enabled,
+		//    then we need to setup the deleteTimer. (Plus we might need to do an immediate delete.)
+		// 
+		// 3. If the maxAge was increased,
+		//    then we don't need to do anything.
+		// 
+		// 4. If the maxAge was decreased,
+		//    then we should do an immediate delete.
+		
+		BOOL shouldDeleteNow = NO;
+		
+		if (oldMaxMessageAge > 0.0)
+		{
+			if (newMaxMessageAge <= 0.0)
+			{
+				// Handles #1
+				[self destroyDeleteTimer];
+			}
+			else if (oldMaxMessageAge > newMaxMessageAge)
+			{
+				// Handles #4
+				shouldDeleteNow = YES;
+			}
+			else
+			{
+				// Handles #3
+				// Nothing to do now
+			}
+		}
+		else if (newMaxMessageAge > 0.0)
+		{
+			// Handles #2
+			shouldDeleteNow = YES;
+		}
+		
+		if (shouldDeleteNow)
+		{
+			[self performDelete];
+			
+			if (self->deleteTimer)
+				[self updateDeleteTimer];
+			else
+				[self createAndStartDeleteTimer];
+		}
+	}};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_async(storageQueue, block);
 }
 
 - (NSTimeInterval)deleteInterval
 {
 	__block NSTimeInterval result = 0;
 	
-//	dispatch_block_t block = ^{
-//		result = self->deleteInterval;
-//	};
-//
-//	if (dispatch_get_specific(storageQueueTag))
-//		block();
-//	else
-//		dispatch_sync(storageQueue, block);
+	dispatch_block_t block = ^{
+		result = self->deleteInterval;
+	};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_sync(storageQueue, block);
 	
 	return result;
 }
 
 - (void)setDeleteInterval:(NSTimeInterval)interval
 {
-//	dispatch_block_t block = ^{ @autoreleasepool {
-//
-//		self->deleteInterval = interval;
-//
-//		// There are several cases we need to handle here.
-//		//
-//		// 1. If the deleteInterval was previously enabled and it just got disabled,
-//		//    then we need to stop the deleteTimer. (And we might as well release it.)
-//		//
-//		// 2. If the deleteInterval was previously disabled and it just got enabled,
-//		//    then we need to setup the deleteTimer. (Plus we might need to do an immediate delete.)
-//		//
-//		// 3. If the deleteInterval increased, then we need to reset the timer so that it fires at the later date.
-//		//
-//		// 4. If the deleteInterval decreased, then we need to reset the timer so that it fires at an earlier date.
-//		//    (Plus we might need to do an immediate delete.)
-//
-//		if (self->deleteInterval > 0.0)
-//		{
-//			if (self->deleteTimer == NULL)
-//			{
-//				// Handles #2
-//				//
-//				// Since the deleteTimer uses the lastDeleteTime to calculate it's first fireDate,
-//				// if a delete is needed the timer will fire immediately.
-//
-//				[self createAndStartDeleteTimer];
-//			}
-//			else
-//			{
-//				// Handles #3
-//				// Handles #4
-//				//
-//				// Since the deleteTimer uses the lastDeleteTime to calculate it's first fireDate,
-//				// if a save is needed the timer will fire immediately.
-//
-//				[self updateDeleteTimer];
-//			}
-//		}
-//		else if (self->deleteTimer)
-//		{
-//			// Handles #1
-//
-//			[self destroyDeleteTimer];
-//		}
-//	}};
-//
-//	if (dispatch_get_specific(storageQueueTag))
-//		block();
-//	else
-//		dispatch_async(storageQueue, block);
+	dispatch_block_t block = ^{ @autoreleasepool {
+		
+		self->deleteInterval = interval;
+		
+		// There are several cases we need to handle here.
+		// 
+		// 1. If the deleteInterval was previously enabled and it just got disabled,
+		//    then we need to stop the deleteTimer. (And we might as well release it.)
+		// 
+		// 2. If the deleteInterval was previously disabled and it just got enabled,
+		//    then we need to setup the deleteTimer. (Plus we might need to do an immediate delete.)
+		// 
+		// 3. If the deleteInterval increased, then we need to reset the timer so that it fires at the later date.
+		// 
+		// 4. If the deleteInterval decreased, then we need to reset the timer so that it fires at an earlier date.
+		//    (Plus we might need to do an immediate delete.)
+		
+		if (self->deleteInterval > 0.0)
+		{
+			if (self->deleteTimer == NULL)
+			{
+				// Handles #2
+				// 
+				// Since the deleteTimer uses the lastDeleteTime to calculate it's first fireDate,
+				// if a delete is needed the timer will fire immediately.
+				
+				[self createAndStartDeleteTimer];
+			}
+			else
+			{
+				// Handles #3
+				// Handles #4
+				// 
+				// Since the deleteTimer uses the lastDeleteTime to calculate it's first fireDate,
+				// if a save is needed the timer will fire immediately.
+				
+				[self updateDeleteTimer];
+			}
+		}
+		else if (self->deleteTimer)
+		{
+			// Handles #1
+			
+			[self destroyDeleteTimer];
+		}
+	}};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_async(storageQueue, block);
 }
 
 - (void)pauseOldMessageDeletionForRoom:(XMPPJID *)roomJID
 {
-//	dispatch_block_t block = ^{ @autoreleasepool {
-//
-//		[self->pausedMessageDeletion addObject:[roomJID bareJID]];
-//	}};
-//
-//	if (dispatch_get_specific(storageQueueTag))
-//		block();
-//	else
-//		dispatch_async(storageQueue, block);
+	dispatch_block_t block = ^{ @autoreleasepool {
+		
+		[self->pausedMessageDeletion addObject:[roomJID bareJID]];
+	}};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_async(storageQueue, block);
 }
 
 - (void)resumeOldMessageDeletionForRoom:(XMPPJID *)roomJID
 {
-//	dispatch_block_t block = ^{ @autoreleasepool {
-//
-//		[self->pausedMessageDeletion removeObject:[roomJID bareJID]];
-//		[self performDelete];
-//	}};
-//
-//	if (dispatch_get_specific(storageQueueTag))
-//		block();
-//	else
-//		dispatch_async(storageQueue, block);
+	dispatch_block_t block = ^{ @autoreleasepool {
+		
+		[self->pausedMessageDeletion removeObject:[roomJID bareJID]];
+		[self performDelete];
+	}};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block();
+	else
+		dispatch_async(storageQueue, block);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -324,7 +324,7 @@ static XMPPRoomHybridStorage *sharedInstance;
 	NSFetchRequest *fetchRequest = [[NSFetchRequest alloc] init];
 	[fetchRequest setEntity:messageEntity];
 	[fetchRequest setPredicate:predicate];
-	[fetchRequest setFetchBatchSize:self.saveThreshold];
+	[fetchRequest setFetchBatchSize:saveThreshold];
 	
 	NSError *error = nil;
 	NSArray *oldMessages = [moc executeFetchRequest:fetchRequest error:&error];
@@ -340,7 +340,7 @@ static XMPPRoomHybridStorage *sharedInstance;
 	{
 		[moc deleteObject:oldMessage];
 		
-		if (++unsavedCount >= self.saveThreshold)
+		if (++unsavedCount >= saveThreshold)
 		{
 			[self save];
 			unsavedCount = 0;
@@ -380,21 +380,21 @@ static XMPPRoomHybridStorage *sharedInstance;
 
 - (void)createAndStartDeleteTimer
 {
-//	if ((deleteTimer == NULL) && (deleteInterval > 0.0) && (maxMessageAge > 0.0))
-//	{
-//		deleteTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, storageQueue);
-//
-//		dispatch_source_set_event_handler(deleteTimer, ^{ @autoreleasepool {
-//
-//			[self performDelete];
-//
-//		}});
-//
-//		[self updateDeleteTimer];
-//
-//		if (deleteTimer)
-//			dispatch_resume(deleteTimer);
-//	}
+	if ((deleteTimer == NULL) && (deleteInterval > 0.0) && (maxMessageAge > 0.0))
+	{
+		deleteTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, storageQueue);
+		
+		dispatch_source_set_event_handler(deleteTimer, ^{ @autoreleasepool {
+			
+			[self performDelete];
+			
+		}});
+		
+		[self updateDeleteTimer];
+		
+		if (deleteTimer)
+			dispatch_resume(deleteTimer);
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -690,58 +690,58 @@ static XMPPRoomHybridStorage *sharedInstance;
                                     inContext:(NSManagedObjectContext *)inMoc
 {
 	if (roomJID == nil) return nil;
-
+	
 	// It's possible to use our internal managedObjectContext only because we're not returning a NSManagedObject.
-
+	
 	__block NSDate *result = nil;
+	
+	dispatch_block_t block = ^{ @autoreleasepool {
+		
+		NSManagedObjectContext *moc = inMoc ? : [self managedObjectContext];
+		
+		NSEntityDescription *entity = [self messageEntity:moc];
+		
+		NSPredicate *predicate;
+		if (xmppStream)
+		{
+			NSString *streamBareJidStr = [[self myJIDForXMPPStream:xmppStream] bare];
+			
+			NSString *predicateFormat = @"roomJIDStr == %@ AND streamBareJidStr == %@";
+			predicate = [NSPredicate predicateWithFormat:predicateFormat, roomJID, streamBareJidStr];
+		}
+		else
+		{
+			predicate = [NSPredicate predicateWithFormat:@"roomJIDStr == %@", roomJID];
+		}
+		
+		NSSortDescriptor *sortDescriptor = [NSSortDescriptor sortDescriptorWithKey:@"localTimestamp" ascending:NO];
+		NSArray *sortDescriptors = @[sortDescriptor];
+		
+		NSFetchRequest *fetchRequest = [[NSFetchRequest alloc] init];
+		[fetchRequest setEntity:entity];
+		[fetchRequest setPredicate:predicate];
+		[fetchRequest setSortDescriptors:sortDescriptors];
+		[fetchRequest setFetchLimit:1];
+		
+		NSError *error = nil;
+		XMPPRoomMessageHybridCoreDataStorageObject *message = (XMPPRoomMessageHybridCoreDataStorageObject *)
+		    [[moc executeFetchRequest:fetchRequest error:&error] lastObject];
 
-//	dispatch_block_t block = ^{ @autoreleasepool {
-//
-//		NSManagedObjectContext *moc = inMoc ? : [self managedObjectContext];
-//
-//		NSEntityDescription *entity = [self messageEntity:moc];
-//
-//		NSPredicate *predicate;
-//		if (xmppStream)
-//		{
-//			NSString *streamBareJidStr = [[self myJIDForXMPPStream:xmppStream] bare];
-//
-//			NSString *predicateFormat = @"roomJIDStr == %@ AND streamBareJidStr == %@";
-//			predicate = [NSPredicate predicateWithFormat:predicateFormat, roomJID, streamBareJidStr];
-//		}
-//		else
-//		{
-//			predicate = [NSPredicate predicateWithFormat:@"roomJIDStr == %@", roomJID];
-//		}
-//
-//		NSSortDescriptor *sortDescriptor = [NSSortDescriptor sortDescriptorWithKey:@"localTimestamp" ascending:NO];
-//		NSArray *sortDescriptors = @[sortDescriptor];
-//
-//		NSFetchRequest *fetchRequest = [[NSFetchRequest alloc] init];
-//		[fetchRequest setEntity:entity];
-//		[fetchRequest setPredicate:predicate];
-//		[fetchRequest setSortDescriptors:sortDescriptors];
-//		[fetchRequest setFetchLimit:1];
-//
-//		NSError *error = nil;
-//		XMPPRoomMessageHybridCoreDataStorageObject *message = (XMPPRoomMessageHybridCoreDataStorageObject *)
-//		    [[moc executeFetchRequest:fetchRequest error:&error] lastObject];
-//
-//		if (error)
-//		{
-//			XMPPLogError(@"%@: %@ - fetchRequest error: %@", THIS_FILE, THIS_METHOD, error);
-//		}
-//		else
-//		{
-//			result = [message.localTimestamp copy];
-//		}
-//	}};
-//
-//	if (inMoc == nil)
-//		dispatch_sync(storageQueue, block);
-//	else
-//		block();
-//
+		if (error)
+		{
+			XMPPLogError(@"%@: %@ - fetchRequest error: %@", THIS_FILE, THIS_METHOD, error);
+		}
+		else
+		{
+			result = [message.localTimestamp copy];
+		}
+	}};
+	
+	if (inMoc == nil)
+		dispatch_sync(storageQueue, block);
+	else
+		block();
+	
 	return result;
 }
 
@@ -751,41 +751,41 @@ static XMPPRoomHybridStorage *sharedInstance;
 	
 	__block XMPPRoomOccupantHybridMemoryStorageObject *occupant = nil;
 	
-//	void (^block)(BOOL) = ^(BOOL shouldCopy){ @autoreleasepool {
-//
-//		XMPPJID *roomJid = [occupantJid bareJID];
-//
-//		if (xmppStream)
-//		{
-//			XMPPJID *streamFullJid = [self myJIDForXMPPStream:xmppStream];
-//
-//			NSDictionary *occupantsRoomsDict = self->occupantsGlobalDict[streamFullJid];
-//			NSDictionary *occupantsRoomDict = occupantsRoomsDict[roomJid];
-//
-//			occupant = occupantsRoomDict[occupantJid];
-//		}
-//		else
-//		{
-//			for (XMPPJID *streamFullJid in self->occupantsGlobalDict)
-//			{
-//				NSDictionary *occupantsRoomsDict = self->occupantsGlobalDict[streamFullJid];
-//				NSDictionary *occupantsRoomDict = occupantsRoomsDict[roomJid];
-//
-//				occupant = occupantsRoomDict[occupantJid];
-//				if (occupant) break;
-//			}
-//		}
-//
-//		if (shouldCopy)
-//		{
-//			occupant = [occupant copy];
-//		}
-//	}};
-//
-//	if (dispatch_get_specific(storageQueueTag))
-//		block(NO);
-//	else
-//		dispatch_sync(storageQueue, ^{ block(YES); });
+	void (^block)(BOOL) = ^(BOOL shouldCopy){ @autoreleasepool {
+		
+		XMPPJID *roomJid = [occupantJid bareJID];
+		
+		if (xmppStream)
+		{
+			XMPPJID *streamFullJid = [self myJIDForXMPPStream:xmppStream];
+			
+			NSDictionary *occupantsRoomsDict = self->occupantsGlobalDict[streamFullJid];
+			NSDictionary *occupantsRoomDict = occupantsRoomsDict[roomJid];
+			
+			occupant = occupantsRoomDict[occupantJid];
+		}
+		else
+		{
+			for (XMPPJID *streamFullJid in self->occupantsGlobalDict)
+			{
+				NSDictionary *occupantsRoomsDict = self->occupantsGlobalDict[streamFullJid];
+				NSDictionary *occupantsRoomDict = occupantsRoomsDict[roomJid];
+								
+				occupant = occupantsRoomDict[occupantJid];
+				if (occupant) break;
+			}
+		}
+		
+		if (shouldCopy)
+		{
+			occupant = [occupant copy];
+		}
+	}};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block(NO);
+	else
+		dispatch_sync(storageQueue, ^{ block(YES); });
 	
 	return occupant;
 }
@@ -796,43 +796,43 @@ static XMPPRoomHybridStorage *sharedInstance;
 	
 	__block NSArray *results = @[];
 	
-//	void (^block)(BOOL) = ^(BOOL shouldCopy){ @autoreleasepool {
-//
-//		if (xmppStream)
-//		{
-//			XMPPJID *streamFullJid = [self myJIDForXMPPStream:xmppStream];
-//
-//			NSDictionary *occupantsRoomsDict = self->occupantsGlobalDict[streamFullJid];
-//			NSDictionary *occupantsRoomDict = occupantsRoomsDict[roomJid];
-//
-//			results = [occupantsRoomDict allValues];
-//		}
-//		else
-//		{
-//			for (XMPPJID *streamFullJid in self->occupantsGlobalDict)
-//			{
-//				NSDictionary *occupantsRoomsDict = self->occupantsGlobalDict[streamFullJid];
-//				NSDictionary *occupantsRoomDict = occupantsRoomsDict[roomJid];
-//
-//				if (occupantsRoomDict)
-//				{
-//					results = [occupantsRoomDict allValues];
-//					break;
-//				}
-//			}
-//		}
-//
-//		if (shouldCopy)
-//		{
-//			NSArray *temp = results;
-//			results = [[NSArray alloc] initWithArray:temp copyItems:YES];
-//		}
-//	}};
-//
-//	if (dispatch_get_specific(storageQueueTag))
-//		block(NO);
-//	else
-//		dispatch_sync(storageQueue, ^{ block(YES); });
+	void (^block)(BOOL) = ^(BOOL shouldCopy){ @autoreleasepool {
+		
+		if (xmppStream)
+		{
+			XMPPJID *streamFullJid = [self myJIDForXMPPStream:xmppStream];
+			
+			NSDictionary *occupantsRoomsDict = self->occupantsGlobalDict[streamFullJid];
+			NSDictionary *occupantsRoomDict = occupantsRoomsDict[roomJid];
+			
+			results = [occupantsRoomDict allValues];
+		}
+		else
+		{
+			for (XMPPJID *streamFullJid in self->occupantsGlobalDict)
+			{
+				NSDictionary *occupantsRoomsDict = self->occupantsGlobalDict[streamFullJid];
+				NSDictionary *occupantsRoomDict = occupantsRoomsDict[roomJid];
+				
+				if (occupantsRoomDict)
+				{
+					results = [occupantsRoomDict allValues];
+					break;
+				}
+			}
+		}
+		
+		if (shouldCopy)
+		{
+			NSArray *temp = results;
+			results = [[NSArray alloc] initWithArray:temp copyItems:YES];
+		}
+	}};
+	
+	if (dispatch_get_specific(storageQueueTag))
+		block(NO);
+	else
+		dispatch_sync(storageQueue, ^{ block(YES); });
 	
 	return results;
 }
