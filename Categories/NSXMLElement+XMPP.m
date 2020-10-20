@@ -276,14 +276,6 @@
 }
 
 /**
- * Shortcut to get a compact string representation of the element.
-**/
-- (NSString *)compactXMLString
-{
-    return [self XMLStringWithOptions:NSXMLNodeCompactEmptyElement];
-}
-
-/**
  *	Shortcut to avoid having to use NSXMLNode everytime
 **/
 

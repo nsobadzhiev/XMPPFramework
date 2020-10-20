@@ -66,7 +66,6 @@ NS_ASSUME_NONNULL_BEGIN
 **/
 
 @property (nonatomic, readonly, nullable) NSString *prettyXMLString;
-@property (nonatomic, readonly, nullable) NSString *compactXMLString;
 
 /**
  * Convenience methods for adding attributes.
