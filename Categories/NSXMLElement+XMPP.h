@@ -62,12 +62,6 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)setXmlns:(NSString *)ns;
 
 /**
- * Convenience methods for printing xml elements with different styles.
-**/
-
-@property (nonatomic, readonly, nullable) NSString *prettyXMLString;
-
-/**
  * Convenience methods for adding attributes.
 **/
 

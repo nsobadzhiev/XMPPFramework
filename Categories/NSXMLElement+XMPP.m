@@ -268,14 +268,6 @@
 }
 
 /**
- * Shortcut to get a pretty (formatted) string representation of the element.
-**/
-- (NSString *)prettyXMLString
-{
-	return [self XMLStringWithOptions:(NSXMLNodePrettyPrint | NSXMLNodeCompactEmptyElement)];
-}
-
-/**
  *	Shortcut to avoid having to use NSXMLNode everytime
 **/
 
