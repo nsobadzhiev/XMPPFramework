@@ -36,7 +36,6 @@ NS_ASSUME_NONNULL_BEGIN
  * Extracting a single element.
 **/
 
-- (nullable NSXMLElement *)elementForName:(NSString *)name xmlns:(NSString *)xmlns NS_REFINED_FOR_SWIFT;
 - (nullable NSXMLElement *)elementForName:(NSString *)name xmlnsPrefix:(NSString *)xmlnsPrefix NS_SWIFT_NAME(element(forName:xmlnsPrefix:));
 
 /**
@@ -49,15 +48,6 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)removeElementsForName:(NSString *)name;
 - (void)removeElementForName:(NSString *)name xmlns:(NSString *)xmlns;
 - (void)removeElementForName:(NSString *)name xmlnsPrefix:(NSString *)xmlnsPrefix;
-
-/**
- * Working with the common xmpp xmlns value.
- * 
- * Use these instead of getting/setting the URI.
- * The category methods below are more readable, and they actually work.
-**/
-
-@property (nonatomic, readonly, nullable) NSString *xmlns;
 
 /**
  * Convenience methods for adding attributes.

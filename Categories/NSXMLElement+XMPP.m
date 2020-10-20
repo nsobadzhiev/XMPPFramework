@@ -120,23 +120,6 @@
 	return elements;
 }
 
-/**
- * This method returns the first child element for the given name and given xmlns (as an NSXMLElement).
- * If no child elements exist for the given name and given xmlns, nil is returned.
-**/
-- (NSXMLElement *)elementForName:(NSString *)name xmlns:(NSString *)xmlns
-{
-	NSArray *elements = [self elementsForLocalName:name URI:xmlns];
-	if ([elements count] > 0)
-	{
-		return elements[0];
-	}
-	else
-	{
-		return nil;
-	}
-}
-
 - (NSXMLElement *)elementForName:(NSString *)name xmlnsPrefix:(NSString *)xmlnsPrefix{
     
     NSXMLElement *result = nil;
@@ -212,15 +195,6 @@
     {
         [self removeChildAtIndex:[[self children] indexOfObject:element]];
     }
-}
-
-/**
- * Returns the common xmlns "attribute", which is only accessible via the namespace methods.
- * The xmlns value is often used in jabber elements.
-**/
-- (NSString *)xmlns
-{
-	return [[self namespaceForPrefix:@""] stringValue];
 }
 
 /**
