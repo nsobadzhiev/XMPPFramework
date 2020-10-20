@@ -543,24 +543,6 @@
 }
 
 /**
- * Returns all the attributes in a dictionary.
-**/
-- (NSMutableDictionary *)attributesAsDictionary
-{
-	NSArray *attributes = [self attributes];
-	NSMutableDictionary *result = [NSMutableDictionary dictionaryWithCapacity:[attributes count]];
-	
-	NSUInteger i;
-	for(i = 0; i < [attributes count]; i++)
-	{
-		NSXMLNode *node = attributes[i];
-		
-		result[[node name]] = [node stringValue];
-	}
-	return result;
-}
-
-/**
  * The following methods return the corresponding value of the node.
 **/
 

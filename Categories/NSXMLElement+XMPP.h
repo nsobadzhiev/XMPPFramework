@@ -123,8 +123,6 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSNumber *)attributeNumberIntValueForName:(NSString *)name withDefaultValue:(int)defaultValue;
 - (NSNumber *)attributeNumberBoolValueForName:(NSString *)name withDefaultValue:(BOOL)defaultValue;
 
-@property (nonatomic, readonly) NSMutableDictionary<NSString*,NSString*> *attributesAsDictionary;
-
 /**
  * Convenience methods for extracting element values in different formats.
  * 
