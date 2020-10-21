@@ -231,11 +231,6 @@
   [self addAttributeWithName:name numberValue:@(unsignedIntegerValue)];
 }
 
-- (void)addAttributeWithName:(NSString *)name stringValue:(NSString *)string
-{
-	[self addAttribute:[NSXMLNode attributeWithName:name stringValue:string]];
-}
-
 - (void)addAttributeWithName:(NSString *)name numberValue:(NSNumber *)number
 {
     [self addAttributeWithName:name stringValue:[number stringValue]];
