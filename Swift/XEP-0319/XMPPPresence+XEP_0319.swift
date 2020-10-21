@@ -7,6 +7,8 @@
 //
 
 import Foundation
+import KissXML
+
 #if canImport(XMPPFramework)
 import XMPPFramework
 #endif

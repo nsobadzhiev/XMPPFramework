@@ -275,7 +275,6 @@ extension GCDMulticastDelegate: XMPPBookmarksDelegate {}
 
 private extension XMPPIQ {
     var query: XMLElement? {
-        
         return element(forName: PrivateXmlStorageConstants.queryElement, xmlns: PrivateXmlStorageConstants.xmlns)
     }
 }
