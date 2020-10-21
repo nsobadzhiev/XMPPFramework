@@ -32,7 +32,7 @@ public extension XMPPPresence {
     @objc func addIdle(since: Date) {
         let dateString = since.xmppDateTimeString
         let idleElement = XMLElement(name: "idle", xmlns: XMPPPresence.idleXmlns)
-        idleElement.addAttribute(withName: "since", objectValue: dateString)
+        idleElement.addAttribute(withName: "since", stringValue: dateString)
         addChild(idleElement)
     }
     
