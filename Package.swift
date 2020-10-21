@@ -76,7 +76,8 @@ let package = Package(
         .target(
             name: "XMPPFrameworkTestsShared",
             dependencies: [
-                "XMPPFramework"
+                "XMPPFramework",
+                "KissXML",
             ],
             path: "Xcode/Testing-Shared",
             exclude: [
@@ -115,7 +116,8 @@ let package = Package(
             name: "XMPPFrameworkTests",
             dependencies: [
                 "XMPPFramework",
-                "XMPPFrameworkTestsShared"
+                "XMPPFrameworkTestsShared",
+                "KissXML"
             ],
             path: "Xcode/Testing-Shared",
             exclude: [
@@ -134,7 +136,8 @@ let package = Package(
             dependencies: [
                 "XMPPFramework",
                 "XMPPFrameworkSwift",
-                "XMPPFrameworkTestsShared"
+                "XMPPFrameworkTestsShared",
+                "KissXML"
             ],
             path: "Xcode",
             exclude: [
