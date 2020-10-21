@@ -21,8 +21,6 @@ NS_ASSUME_NONNULL_BEGIN
  * Use these instead of [NSXMLElement initWithName:URI:].
  * The category methods below are more readable, and they actually work.
 **/
-
-+ (NSXMLElement *)elementWithName:(NSString *)name xmlns:(NSString *)ns;
 - (instancetype)initWithName:(NSString *)name xmlns:(NSString *)ns;
 
 /**

@@ -61,16 +61,6 @@
     }
 }
 
-/**
- * Quick method to create an element
-**/
-+ (NSXMLElement *)elementWithName:(NSString *)name xmlns:(NSString *)ns
-{
-	NSXMLElement *element = [NSXMLElement elementWithName:name];
-	[element setXmlns:ns];
-	return element;
-}
-
 - (id)initWithName:(NSString *)name xmlns:(NSString *)ns
 {
 	if ((self = [self initWithName:name]))
