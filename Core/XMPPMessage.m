@@ -1,6 +1,7 @@
 #import "XMPPMessage.h"
 #import "XMPPJID.h"
 #import "NSXMLElement+XMPP.h"
+@import KissXML;
 
 #import <objc/runtime.h>
 

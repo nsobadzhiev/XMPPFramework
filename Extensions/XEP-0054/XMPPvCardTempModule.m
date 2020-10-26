@@ -145,7 +145,7 @@
 		
 		XMPPvCardTemp *vCardTemp = [self->_xmppvCardTempModuleStorage vCardTempForJID:jid xmppStream:self->xmppStream];
 		
-		if (vCardTemp == nil && shouldFetch && [self->_xmppvCardTempModuleStorage shouldFetchvCardTempForJID:jid xmppStream:self->xmppStream])
+		if (shouldFetch && [self->_xmppvCardTempModuleStorage shouldFetchvCardTempForJID:jid xmppStream:self->xmppStream])
 		{
 			[self _fetchvCardTempForJID:jid];
 		}
