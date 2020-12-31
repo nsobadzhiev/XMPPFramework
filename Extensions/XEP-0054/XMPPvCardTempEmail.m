@@ -11,6 +11,7 @@
 #import "XMPPvCardTempEmail.h"
 #import "XMPPLogging.h"
 
+@import KissXML;
 #import <objc/runtime.h>
 
 #if ! __has_feature(objc_arc)
@@ -117,7 +118,7 @@
 }
 
 
-- (void)setIsUserid:(NSString *)userid {
+- (void)setUserid:(NSString *)userid {
 	XMPP_VCARD_SET_STRING_CHILD(userid, @"USERID");
 }
 
